@@ -94,7 +94,7 @@
         }
         $env.PATH = ($env.PATH |
           split row (char esep) |
-          prepend /home/myuser/.apps |
+          prepend /home/keinsell/.apps |
           append /usr/bin/env
         )
       '';
@@ -129,10 +129,9 @@
     };
 
     # https://ohmyposh.dev/docs/themes
-    # space,star,uew,zash
     oh-my-posh = {
       enable = true;
-      useTheme = "space";
+      useTheme = "uew";
     };
     zellij = {
       enable = true;
