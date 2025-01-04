@@ -124,6 +124,7 @@ in {
       # "1Password 7" = 1333542190;
       Xcode = 497799835;
       TestFlight = 899247664;
+      "Apple Developer" = 640199958;
     };
 
     whalebrews = [];
