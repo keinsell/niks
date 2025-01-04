@@ -123,6 +123,7 @@ in {
       "1Password for Safari" = 1569813296;
       # "1Password 7" = 1333542190;
       Xcode = 497799835;
+      TestFlight = 899247664;
     };
 
     whalebrews = [];
