@@ -35,6 +35,10 @@
       base_keymap = "VSCode";
       soft_wrap = "editor_width";
       tab_size = 2;
+      theme = {
+          dark = "Catppuccin Mocha";
+          light = "macOS Classic Light";
+      };
 
       load_direnv = "shell_hook";
 
