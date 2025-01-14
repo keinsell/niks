@@ -54,6 +54,8 @@
       age
       age-plugin-ledger
       age-plugin-fido2-hmac
+
+      lazyjj
     ]
     ++ (with nodePackages; [pnpm])
     ++ (
