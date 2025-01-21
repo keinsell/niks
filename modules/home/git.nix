@@ -40,6 +40,7 @@
         # Signing key was generated at 01/01/2025 and replaced older one which was used
         # Key itself is available on keyboase and can be imported to local machine using
         # keybase pgp pull-private "73D2E5DFD6CC2BD08C6822E45B8600D62E632A5A"
+        # gpg --import <key-file>
         key = "73D2E5DFD6CC2BD08C6822E45B8600D62E632A5A";
         # TODO: Implement secret management mechanism which would allow for key persistance
         # in repository, nix-sops and usage of age should be considerable option for this
