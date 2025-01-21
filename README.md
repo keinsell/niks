@@ -52,4 +52,7 @@ nix run .#activate $USER@
 ### Version Control
 
 #### Git Credential Manager (GCM)
+
+Configuration uses [Git Credential Manager (GCM)](https://microsoft.github.io/Git-Credential-Manager-for-Windows/Docs/CredentialManager.html) for Linux credentials handling along with `secretservice` for storing credentials in the system keyring, for macOS it uses native keychain.
+
 #### PGP Commit Signing Integration

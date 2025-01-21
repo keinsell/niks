@@ -53,8 +53,15 @@
 
       extraConfig = {
         init.defaultBranch = "trunk";
-        credential = {
+        credential = if pkgs.stdenv.isDarwin then {
+          helper = "osxkeychain";
+          useHttpPath = true;
+        } else {
           helper = "${pkgs.git-credential-manager}/bin/git-credential-manager";
+          credentialStore = "secretservice";
+          cacheOptions = {
+            timeout = 36000;
+          };
         };
 
         # init.defaultBranch = "master";
