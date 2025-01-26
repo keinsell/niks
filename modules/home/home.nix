@@ -234,6 +234,8 @@
         $env.PATH = ($env.PATH |
           split row (char esep) |
           prepend /home/keinsell/.apps |
+          prepend /home/keinsell/.local/bin |
+          prepend /home/keinsell/.cargo/bin |
           append /usr/bin/env
         )
       '';
