@@ -289,6 +289,7 @@
     thefuck.enable = true;
     broot.enable = true;
     eza.enable = true;
+    tealdeer.enable = true;
 
     git = {
       enable = true;
