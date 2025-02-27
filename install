@@ -1,15 +1,464 @@
-#!/bin/sh
-# Copyright (c) 2024 Jakub Olan. All rights reserved.
+#!/usr/bin/env bash
 
-# Install Nix on current operating system.
+# TODO: Implement better look of installation logs
+# TODO: Improve handling of existing configuration
+# TODO: Add support to be used for other usernames than "keinsell"
 
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | \
-  sh -s -- install --no-confirm --extra-conf "trusted-users = $(whoami)"
+set -euo pipefail
 
-. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+# ------------------------------
+# Color definitions and formatting
+# ------------------------------
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+PURPLE='\033[0;35m'
+BOLD='\033[1m'
+CYAN='\033[0;36m'
 
-nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
-nix-channel --update
+# ------------------------------
+# Configuration variables
+# ------------------------------
+HM_REPO_URL="https://github.com/keinsell/niks.git"
+HM_CONFIG_DIR="$HOME/.config/home-manager"
+CONFIRM_FLAG=false
+VERBOSE_FLAG=false
+SKIP_LOGO=false
 
-nix-shell '<home-manager>' -A install  
+# ------------------------------
+# Status tracking
+# ------------------------------
+REQUIREMENTS=()
+ACTIONS=()
 
+# ------------------------------
+# Helper functions
+# ------------------------------
+info() {
+    echo -e "${BLUE}INFO:${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}SUCCESS:${NC} $1"
+}
+
+warning() {
+    echo -e "${YELLOW}WARNING:${NC} $1"
+}
+
+error() {
+    echo -e "${RED}ERROR:${NC} $1"
+    exit 1
+}
+
+plan() {
+    echo -e "${PURPLE}PLAN:${NC} $1"
+}
+
+section() {
+    echo -e "\n${BOLD}${CYAN}==== $1 ====${NC}\n"
+}
+
+verbose() {
+    if [ "$VERBOSE_FLAG" = true ]; then
+        echo -e "${CYAN}VERBOSE:${NC} $1"
+    fi
+}
+
+ascii_art() {
+    local c1=${BLUE}
+    local c2=${CYAN}
+    local reset="\033[0m"
+    cat << EOF
+        ${c1}          ▗▄▄▄       ${c2}▗▄▄▄▄    ▄▄▄▖
+        ${c1}          ▜███▙       ${c2}▜███▙  ▟███▛
+        ${c1}           ▜███▙       ${c2}▜███▙▟███▛
+        ${c1}            ▜███▙       ${c2}▜██████▛
+        ${c1}     ▟█████████████████▙ ${c2}▜████▛     ${c1}▟▙
+        ${c1}    ▟███████████████████▙ ${c2}▜███▙    ${c1}▟██▙
+        ${c2}           ▄▄▄▄▖           ▜███▙  ${c1}▟███▛
+        ${c2}          ▟███▛             ▜██▛ ${c1}▟███▛
+        ${c2}         ▟███▛               ▜▛ ${c1}▟███▛
+        ${c2}▟███████████▛                  ${c1}▟██████████▙
+        ${c2}▜██████████▛                  ${c1}▟███████████▛
+        ${c2}      ▟███▛ ${c1}▟▙               ▟███▛
+        ${c2}     ▟███▛ ${c1}▟██▙             ▟███▛
+        ${c2}    ▟███▛  ${c1}▜███▙           ▝▀▀▀▀
+        ${c2}    ▜██▛    ${c1}▜███▙ ${c2}▜██████████████████▛
+        ${c2}     ▜▛     ${c1}▟████▙ ${c2}▜████████████████▛
+        ${c1}           ▟██████▙       ${c2}▜███▙
+        ${c1}          ▟███▛▜███▙       ${c2}▜███▙
+        ${c1}         ▟███▛  ▜███▙       ${c2}▜███▙
+        ${c1}         ▝▀▀▀    ▀▀▀▀▘       ${c2}▀▀▀▘
+EOF
+    echo -n "$reset"
+}
+
+# ------------------------------
+# Display NixOS ASCII
+# ------------------------------
+# This feature is ~~inspired~~ by neofetch
+# https://github.com/dylanaraps/neofetch/blob/master/neofetch#L8976
+
+display_logo() {
+    if [ "$SKIP_LOGO" = true ]; then
+        return
+    fi
+
+    # Using just the bold and normal formatting instead of colors
+    echo -e "          ▗▄▄▄       ▗▄▄▄▄    ▄▄▄▖"
+    echo -e "          ▜███▙       ▜███▙  ▟███▛"
+    echo -e "           ▜███▙       ▜███▙▟███▛"
+    echo -e "            ▜███▙       ▜██████▛"
+    echo -e "     ▟█████████████████▙ ▜████▛     ▟▙"
+    echo -e "    ▟███████████████████▙ ▜███▙    ▟██▙"
+    echo -e "           ▄▄▄▄▖           ▜███▙  ▟███▛"
+    echo -e "          ▟███▛             ▜██▛ ▟███▛"
+    echo -e "         ▟███▛               ▜▛ ▟███▛"
+    echo -e "▟███████████▛                  ▟██████████▙"
+    echo -e "▜██████████▛                  ▟███████████▛"
+    echo -e "      ▟███▛ ▟▙               ▟███▛"
+    echo -e "     ▟███▛ ▟██▙             ▟███▛"
+    echo -e "    ▟███▛  ▜███▙           ▝▀▀▀▀"
+    echo -e "    ▜██▛    ▜███▙ ▜██████████████████▛"
+    echo -e "     ▜▛     ▟████▙ ▜████████████████▛"
+    echo -e "           ▟██████▙       ▜███▙"
+    echo -e "          ▟███▛▜███▙       ▜███▙"
+    echo -e "         ▟███▛  ▜███▙       ▜███▙"
+    echo -e "         ▝▀▀▀    ▀▀▀▀▘       ▀▀▀▘"
+
+    echo
+    echo -e "${BOLD}Niks Installation System${NC}"
+    echo -e "A streamlined NixOS-based environment installer"
+    echo -e "-----------------------------------------------------"
+    echo
+}
+
+# ------------------------------
+# Parse command line arguments
+# ------------------------------
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --confirm)
+                CONFIRM_FLAG=true
+                shift
+                ;;
+            --verbose)
+                VERBOSE_FLAG=true
+                shift
+                ;;
+            --skip-logo)
+                SKIP_LOGO=true
+                shift
+                ;;
+            --help)
+                echo "Niks Installation System"
+                echo "Usage: $0 [options]"
+                echo
+                echo "Options:"
+                echo "  --confirm    Skip confirmation prompt and proceed with installation"
+                echo "  --verbose    Show detailed progress information"
+                echo "  --skip-logo  Don't display the ASCII logo"
+                echo "  --help       Show this help message"
+                exit 0
+                ;;
+            *)
+                warning "Unknown option: $1"
+                shift
+                ;;
+        esac
+    done
+}
+
+# ------------------------------
+# Check system requirements silently
+# ------------------------------
+check_requirements() {
+    verbose "Checking if Nix is installed..."
+    if ! command -v nix &> /dev/null; then
+        REQUIREMENTS+=("nix:Nix package manager is not installed")
+        ACTIONS+=("nix:Install Nix package manager")
+    else
+        NIX_VERSION=$(nix --version)
+        verbose "Nix is installed: $NIX_VERSION"
+    fi
+
+    verbose "Checking if Home Manager is installed..."
+    if ! command -v home-manager &> /dev/null; then
+        REQUIREMENTS+=("home-manager:Home Manager is not installed")
+        ACTIONS+=("home-manager:Install Home Manager")
+    else
+        verbose "Home Manager is installed"
+    fi
+
+    verbose "Checking Home Manager configuration..."
+    if [ -d "$HM_CONFIG_DIR" ]; then
+        if [ -d "$HM_CONFIG_DIR/.git" ]; then
+            verbose "Home Manager git configuration found at $HM_CONFIG_DIR"
+            ACTIONS+=("config:Update existing Home Manager configuration")
+        else
+            verbose "Non-git Home Manager configuration found at $HM_CONFIG_DIR"
+            REQUIREMENTS+=("config:Non-git Home Manager configuration exists")
+            ACTIONS+=("config:Backup existing configuration and clone new one")
+        fi
+    else
+        verbose "No Home Manager configuration found"
+        REQUIREMENTS+=("config:No Home Manager configuration found")
+        ACTIONS+=("config:Clone Home Manager configuration")
+    fi
+}
+
+# ------------------------------
+# Display requirements and planned actions
+# ------------------------------
+display_requirements() {
+    section "System Requirements Check"
+
+    if [ ${#REQUIREMENTS[@]} -eq 0 ]; then
+        success "All requirements are met!"
+    else
+        for req in "${REQUIREMENTS[@]}"; do
+            IFS=':' read -r type message <<< "$req"
+            warning "$message"
+
+            # Add additional information based on component
+            case $type in
+                nix)
+                    echo "  - Will install using Determinate Systems installer"
+                    echo "  - Will create /nix directory and add 'nix' user/group"
+                    echo "  - Will modify shell profiles to source Nix environment"
+                    ;;
+                home-manager)
+                    echo "  - Will add Home Manager channel to your Nix channels"
+                    echo "  - Will install Home Manager to manage user environment"
+                    ;;
+                config)
+                    if [[ "$message" == *"Non-git"* ]]; then
+                        echo "  - Will back up your existing configuration"
+                        echo "  - Backup will be stored at: ${HM_CONFIG_DIR}.backup.$(date +%Y%m%d%H%M%S)"
+                    fi
+                    echo "  - Will clone configuration from: $HM_REPO_URL"
+                    ;;
+            esac
+            echo
+        done
+    fi
+}
+
+# ------------------------------
+# Display installation plan
+# ------------------------------
+display_plan() {
+    section "Installation Plan"
+
+    if [ ${#ACTIONS[@]} -eq 0 ]; then
+        success "No actions needed! Your system is already fully set up."
+        exit 0
+    fi
+
+    echo -e "${YELLOW}The following actions will be performed:${NC}"
+    for action in "${ACTIONS[@]}"; do
+        IFS=':' read -r type message <<< "$action"
+        echo -e "  - ${PURPLE}$message${NC}"
+    done
+    echo
+
+    echo -e "${YELLOW}This process will:${NC}"
+    echo "  - Modify your shell profile files (~/.profile, ~/.bashrc, etc.)"
+    echo "  - Install packages in your user environment"
+    echo "  - Configure your dotfiles according to the Home Manager config"
+    echo
+}
+
+# ------------------------------
+# Confirm installation with user
+# ------------------------------
+confirm_installation() {
+    if [ "$CONFIRM_FLAG" = true ]; then
+        verbose "Skipping confirmation due to --confirm flag"
+        return 0
+    fi
+
+    read -p "Do you want to proceed with the installation? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Installation cancelled."
+        exit 0
+    fi
+}
+
+# ------------------------------
+# Installation functions
+# ------------------------------
+install_nix() {
+    section "Installing Nix"
+    info "Installing Nix via the Determinate Systems installer..."
+
+    # Create a temporary directory
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+
+    # Download the determinate installer
+    info "Downloading the Nix installer..."
+    curl -L https://github.com/DeterminateSystems/nix-installer/releases/download/v0.13.1/nix-installer-x86_64-linux > nix-installer
+    chmod +x nix-installer
+
+    # Run the installer
+    info "Running the Nix installer..."
+    ./nix-installer install --no-confirm --extra-conf "trusted-users = $(id -un)" || error "Failed to install Nix"
+
+    # Clean up
+    cd - > /dev/null
+    rm -rf "$TEMP_DIR"
+
+    # Source nix
+    info "Sourcing Nix environment variables..."
+    if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+        . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+    fi
+
+    success "Nix has been installed on your system"
+}
+
+install_home_manager() {
+    section "Installing Home Manager"
+
+    info "Adding Home Manager channel..."
+    nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
+
+    info "Updating channels..."
+    nix-channel --update
+
+    # Install Home Manager
+    info "Installing Home Manager..."
+    nix-shell '<home-manager>' -A install
+    success "Home Manager has been installed on your system"
+}
+
+clone_config() {
+    section "Setting Up Configuration"
+
+    if [ -d "$HM_CONFIG_DIR" ]; then
+        if [ -d "$HM_CONFIG_DIR/.git" ]; then
+            info "Updating existing Home Manager configuration..."
+            cd "$HM_CONFIG_DIR"
+            git pull
+        else
+            info "Backing up existing Home Manager configuration..."
+            BACKUP_DIR="${HM_CONFIG_DIR}.backup.$(date +%Y%m%d%H%M%S)"
+            mv "$HM_CONFIG_DIR" "$BACKUP_DIR"
+            info "Backed up to: $BACKUP_DIR"
+
+            info "Cloning new Home Manager configuration..."
+            git clone "$HM_REPO_URL" "$HM_CONFIG_DIR"
+        fi
+    else
+        info "Cloning Home Manager configuration..."
+        mkdir -p "$(dirname "$HM_CONFIG_DIR")"
+        git clone "$HM_REPO_URL" "$HM_CONFIG_DIR"
+    fi
+
+    success "Home Manager configuration is ready at: $HM_CONFIG_DIR"
+}
+
+apply_config() {
+    section "Applying Configuration"
+
+    info "Applying Home Manager configuration to your user environment..."
+    cd "$HM_CONFIG_DIR"
+
+    info "Running 'nh home switch' to apply configuration..."
+    cd $HOME/.config/home-manager
+    nix --extra-experimental-features "nix-command flakes" run
+
+    success "Home Manager configuration has been applied to your user environment"
+}
+
+# ------------------------------
+# Pre-authorize sudo if needed
+# ------------------------------
+prepare_sudo() {
+    # Check if we need sudo at all
+    if [[ "${REQUIREMENTS[*]}" =~ "nix:" ]]; then
+        info "The Nix installation will require sudo permissions."
+        info "Please enter your password to pre-authorize sudo for the installation process:"
+        sudo -v
+
+        # Keep sudo credentials fresh throughout the installation
+        (while true; do sudo -v; sleep 60; done) &
+        SUDO_KEEPALIVE_PID=$!
+
+        # Make sure to kill the sudo refresher when the script exits
+        trap 'kill $SUDO_KEEPALIVE_PID 2>/dev/null || true' EXIT
+    fi
+}
+
+# ------------------------------
+# Main installation process
+# ------------------------------
+run_installation() {
+    section "Starting Installation"
+
+    # Install Nix if needed
+    if [[ "${REQUIREMENTS[*]}" =~ "nix:" ]]; then
+        install_nix
+    fi
+
+    # Install Home Manager if needed
+    if [[ "${REQUIREMENTS[*]}" =~ "home-manager:" ]]; then
+        install_home_manager
+    fi
+
+    # Set up configuration
+    if [[ "${ACTIONS[*]}" =~ "config:" ]]; then
+        clone_config
+    fi
+
+    # Apply configuration
+    apply_config
+}
+
+# ------------------------------
+# Display completion message
+# ------------------------------
+display_completion() {
+    section "Installation Complete"
+
+    success "Niks setup is complete!"
+    echo
+    echo -e "${YELLOW}Next steps:${NC}"
+    echo "1. Restart your shell or run 'source ~/.profile' to ensure"
+    echo "   all installed tools are available in your PATH."
+    echo "2. Verify your configuration with 'nh home info'"
+    echo "3. To update your environment later, run 'nh home switch'"
+    echo
+}
+
+# ------------------------------
+# Main function
+# ------------------------------
+main() {
+    parse_arguments "$@"
+
+    display_logo
+
+    check_requirements
+
+    display_requirements
+
+    display_plan
+
+    confirm_installation
+
+    prepare_sudo
+
+    run_installation
+
+    display_completion
+}
+
+# Run the main function with all script arguments
+main "$@"

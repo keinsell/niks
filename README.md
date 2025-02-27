@@ -11,11 +11,11 @@
 
 Even through repository is using (experimental) Flakes you should remember that [flakes aren't real and cannot hurt you](https://jade.fyi/blog/flakes-arent-real/). Instllation process is explained from scratch as this repository is meant to configure operating system from scratch.
 
-#### Install XCode
+```bash
+curl https://raw.githubusercontent.com/keinsell/niks/refs/heads/main/install | sh
+```
 
-```
-  
-```
+### [UNFINISHED] Development
 
 #### Install Nix
 
