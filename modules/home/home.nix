@@ -43,6 +43,9 @@
       nix-info
       nixpkgs-fmt
       comma
+      nix-direnv
+      nodejs_latest
+      typescript
 
       # Knowledge-base Management
       markdown-oxide
@@ -360,7 +363,7 @@
 
       difftastic = {
         enable = true;
-        display = "inline";
+        display = "side-by-side";
       };
 
       extraConfig = {
