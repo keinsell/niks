@@ -15,9 +15,6 @@ in {
   nix.settings = {
     trusted-users = ["root" "keinsell" "@admin"];
 
-    # https://github.com/NixOS/nix/issues/7273
-    auto-optimise-store = false;
-
     experimental-features = [
       "nix-command"
       "flakes"
@@ -74,14 +71,14 @@ in {
   # configuration itself, so it's omited there and one should be contained in
   # home-manager module.
 
-  environment.shells = [pkgs.zsh pkgs.nushell];
+  environment.shells = [pkgs.nushell];
 
   environment.systemPackages = [
     pkgs.nh
   ];
 
   homebrew = {
-    enable = true;
+    enable = false;
     global.brewfile = true;
 
     casks = [
@@ -90,7 +87,6 @@ in {
       "jetbrains-toolbox"
       "obsidian"
       "raycast"
-      "stats"
       "utm"
       "zed@preview"
       "1password@nightly"
