@@ -56,7 +56,7 @@
       # work.
       less
       rustup
-      # zig
+      zig
       nodejs_latest
       pnpm
       bun
@@ -116,21 +116,24 @@
       # Monospace Fonts
       commit-mono
       jetbrains-mono
+      cargo-autoinherit
       monaspace
-      _3270font
-      _0xproto
       departure-mono
-
       dejavu_fonts
       powerline-fonts
       yt-dlp
       cargo-binstall
-      purescript
-      purescript-psa
       git-credential-manager
       spago
+      ocaml
+      ocaml-top
+      ocaml_make
+      ocamlformat
+      reason
+      opam
     ]
-    ++ (with nodePackages; [pnpm])
+    ++ (with nodePackages; [pnpm reason esy])
+    ++ (with ocamlPackages; [ocaml-lsp merlin reason ocaml melange])
     ++ (
       if pkgs.stdenv.isDarwin
       then (with pkgs.darwin.apple_sdk.frameworks; [CoreServices Foundation Security])
@@ -140,7 +143,6 @@
   home.file = {
     "${config.xdg.configHome}/ghostty/config".source = ../../dotfiles/ghostly.toml;
     ".cargo/config.toml".source = ../../dotfiles/cargo.toml;
-    "${config.xdg.configHome}/starship.toml".source = ../../dotfiles/starship.toml;
   };
 
   programs = {
@@ -369,25 +371,25 @@
       extraConfig = {
         init.defaultBranch = "trunk";
         credential = {
-          # https://github.com/git-ecosystem/git-credential-manager
-          helper = "${pkgs.git-credential-manager}/bin/git-credential-manager";
-
-          # Keychain is not a problem with macOS, but with linux
-          # i currently have trouble with storage of credentials
-          # as gpg/pass is not initialized and linux do not have
-          # gui - secretservice will not be available.
+          # For macOS: Use Git Credential Manager with keychain storage
+          # For Linux: Use 'store' first (plain text file), then 'cache' (in-memory)
           # https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
           # https://git-scm.com/docs/git-credential-store
-          # https://github.com/git-ecosystem/git-credential-manager/blob/main/docs/credstores.md
+          helper =
+            if pkgs.stdenv.isDarwin
+            then [
+              "${pkgs.git-credential-manager}/bin/git-credential-manager"
+            ]
+            else [
+              "store" # Plain text storage
+              "cache --timeout=604800" # In-memory cache with 7-day timeout
+            ];
+
+          # For macOS only - used with Git Credential Manager
           credentialStore =
             if pkgs.stdenv.isDarwin
             then "keychain"
-            else "cache";
-
-          # ! Also change this when store will be fixed.
-          cacheOptions = {
-            timeout = 604800;
-          };
+            else "";
         };
 
         filter.lfs.clean = "${pkgs.git-lfs}/bin/git-lfs clean -- %f";
